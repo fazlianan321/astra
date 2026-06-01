@@ -6,10 +6,10 @@ app = Flask(__name__)
 
 # --- KONFIGURASI DATABASE XAMPP ---
 # Pastikan XAMPP MySQL sudah Running. Nama database: db_astra
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/db_astra'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/db_astra'
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+# db = SQLAlchemy(app)
 
 # Folder untuk menyimpan foto rating
 UPLOAD_FOLDER = 'static/uploads'
