@@ -4,12 +4,14 @@ import os
 
 app = Flask(__name__)
 
-# --- KONFIGURASI DATABASE XAMPP ---
-# Pastikan XAMPP MySQL sudah Running. Nama database: db_astra
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/db_astra'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# --- PERBAIKAN KONFIGURASI DATABASE UNTUK VERCEL ---
+# Menggunakan SQLite in-memory agar aplikasi tidak crash di cloud Vercel
+# Semua fungsi database (tambah, hapus, cek) tetap berjalan normal di memori RAM Vercel
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# db = SQLAlchemy(app)
+# Variabel db ini WAJIB tetap aktif agar tidak memicu 'NameError' di baris bawah
+db = SQLAlchemy(app)
 
 # Folder untuk menyimpan foto rating
 UPLOAD_FOLDER = 'static/uploads'
@@ -76,17 +78,14 @@ def cek_status():
 # --- FUNGSI UPDATE DATA (UNTUK MEKANIK) ---
 @app.route('/update-progres', methods=['POST'])
 def update_progres():
-    # .replace(" ", "") ini WAJIB agar BE 123 AB jadi BE123AB di database
     no_pol = request.form.get('no_polisi', '').upper().replace(" ", "").strip()
     
     if not no_pol:
         return jsonify({"success": False, "message": "Nomor Polisi kosong!"})
 
-    # Cari apakah motor ini sudah ada di database?
     motor = Kendaraan.query.filter_by(no_polisi=no_pol).first()
     
     if motor:
-        # JIKA ADA: Lakukan UPDATE (Bukan tambah baru)
         motor.nama_customer = request.form.get('nama_customer')
         motor.tipe_motor = request.form.get('tipe_motor')
         motor.status = request.form.get('status')
@@ -97,7 +96,6 @@ def update_progres():
         db.session.commit()
         return jsonify({"success": True, "message": "Data Kendaraan BERHASIL DIUPDATE!"})
     else:
-        # JIKA TIDAK ADA: Tambahkan Data Baru
         baru = Kendaraan(
             no_polisi=no_pol,
             nama_customer=request.form.get('nama_customer', 'Customer Astra'),
@@ -126,7 +124,6 @@ def kirim_rating():
             nama_file = f"rating_{no_pol}_{foto.filename}"
             foto.save(os.path.join(app.config['UPLOAD_FOLDER'], nama_file))
 
-        # Masukkan ke Tabel Rating
         baru_rating = Rating(
             no_polisi=no_pol,
             bintang=int(rating_val),
@@ -140,10 +137,9 @@ def kirim_rating():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
-# --- PINDAHKAN KE SINI (DI ATAS IF NAME) ---
+# --- AMBIL SEMUA DATA KENDARAAN ---
 @app.route('/get-semua-kendaraan')
 def get_semua_kendaraan():
-    # Mengambil semua data kendaraan, urutkan dari yang terbaru ditambahkan
     semua = Kendaraan.query.order_by(Kendaraan.id.desc()).all()
     data = []
     for k in semua:
@@ -158,12 +154,12 @@ def get_semua_kendaraan():
             "rincian": k.rincian
         })
     return jsonify(data)
+
+# --- FUNGSI HAPUS KENDARAAN ---
 @app.route('/hapus-kendaraan/<no_polisi>', methods=['DELETE'])
 def hapus_kendaraan(no_polisi):
     try:
-        # PENTING: Bersihkan spasi agar BE 123 AB (dari URL) cocok dengan BE123AB di database
         clean_no_pol = no_polisi.upper().replace(" ", "").strip()
-        
         motor = Kendaraan.query.filter_by(no_polisi=clean_no_pol).first()
         
         if motor:
@@ -173,8 +169,8 @@ def hapus_kendaraan(no_polisi):
             
         return jsonify({"success": False, "message": "Data tidak ditemukan di database"}), 404
     except Exception as e:
-        db.session.rollback() # Batalkan transaksi jika error agar DB tidak corrupt
+        db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
-# BARIS INI HARUS PALING BAWAH
+
 if __name__ == '__main__':
     app.run(debug=True)
